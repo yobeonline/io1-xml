@@ -1,5 +1,5 @@
-#include "io1/xml.hpp"
 #include <iostream>
+#include "io1/xml.hpp"
 
 int main()
 {
@@ -16,7 +16,7 @@ int main()
         auto book = doc.tree("book") << io1::attr("category", "history") << io1::attr("lang", "fr");
         book << io1::tag("title") << "Les Misérables";
         book << io1::tag("author") << "Victor Hugo";
-        book << io1::tag("price") << attr("currency", "EUR") << 12.50;
+        book << io1::tag("price") << io1::attr("currency", "EUR") << 12.50;
     }
 
     {

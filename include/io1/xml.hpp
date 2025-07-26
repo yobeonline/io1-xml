@@ -3,7 +3,7 @@
 #include <array>
 #include <type_traits>
 #include <string_view>
-#include <iosfwd>
+#include <iostream>
 #include <cassert>
 #include <utility>
 
