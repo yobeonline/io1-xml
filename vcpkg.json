@@ -1,0 +1,11 @@
+{
+  "name": "io1-xml",
+  "version-string": "latest",
+  "dependencies": [],
+  "features": {
+    "tests": {
+      "description": "Unit testing",
+      "dependencies": [ "doctest" ]
+    }
+  }
+}
