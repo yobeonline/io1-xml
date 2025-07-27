@@ -9,13 +9,12 @@
 
 namespace io1
 {
-
   template<typename T>
   struct attr
   {
-    explicit attr(std::string_view name, T value) noexcept:name(name), value(value) {}
+    explicit attr(std::string_view name, T const &value) noexcept:name(name), value(value) {}
     std::string_view name;
-    T value;
+    T const &value;
   };
 
   struct tag
@@ -75,7 +74,7 @@ namespace io1
         }
       }
 
-      template<typename T> xml_tag & operator<<(attr<T> const a) noexcept
+      template<typename T> xml_tag & operator<<(attr<T> const & a) noexcept
       {
         assert(stream_ && "Don't use a moved from object");
         (*stream_) << ' ' << a.name << "=\"" << a.value << '\"';

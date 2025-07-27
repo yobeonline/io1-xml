@@ -14,7 +14,7 @@ int main()
 
     {
         auto book = doc.tree("book") << io1::attr("category", "history") << io1::attr("lang", "fr");
-        book << io1::tag("title") << "Les Misérables";
+        book << io1::tag("title") << "Les Miserables";
         book << io1::tag("author") << "Victor Hugo";
         book << io1::tag("price") << io1::attr("currency", "EUR") << 12.50;
     }
