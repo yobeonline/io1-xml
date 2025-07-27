@@ -3,30 +3,31 @@
 
 int main()
 {
-    auto doc = io1::xml_doc(std::cout, "bookstore");
+  using namespace io1::xml;
+  auto d = doc(std::cout, "bookstore");
     
-    {
-        auto book = doc << io1::tree("book") << io1::attr("category", "fiction") << io1::attr("lang", "en");
-        book << io1::tag("title") << "The Time Machine";
-        book << io1::tag("author") << "H. G. Wells";
-        book << io1::tag("price") << io1::attr("currency", "USD") << 15.99;
-    }
+  {
+      auto book = d << tree("book") << attr("category", "fiction") << attr("lang", "en");
+      book << tag("title") << "The Time Machine";
+      book << tag("author") << "H. G. Wells";
+      book << tag("price") << attr("currency", "USD") << 15.99;
+  }
 
-    {
-        auto book = doc << io1::tree("book") << io1::attr("category", "history") << io1::attr("lang", "fr");
-        book << io1::tag("title") << "Les Miserables";
-        book << io1::tag("author") << "Victor Hugo";
-        book << io1::tag("price") << io1::attr("currency", "EUR") << 12.50;
-    }
+  {
+      auto book = d << tree("book") << attr("category", "history") << attr("lang", "fr");
+      book << tag("title") << "Les Miserables";
+      book << tag("author") << "Victor Hugo";
+      book << tag("price") << attr("currency", "EUR") << 12.50;
+  }
 
-    {
-        doc << io1::tree("magazine") << io1::attr("title", "Science Weekly");
-    }
+  {
+      d << tree("magazine") << attr("title", "Science Weekly");
+  }
 
-    {
-        auto newspaper = doc << io1::tree("newspaper") << io1::attr("date", "2025-07-14");
-        newspaper << io1::tag("headline") << "AI Advances in Compile-Time XML";
-    }
+  {
+      auto newspaper = d << tree("newspaper") << attr("date", "2025-07-14");
+      newspaper << tag("headline") << "AI Advances in Compile-Time XML";
+  }
 
-    return 0;
+  return 0;
 }
