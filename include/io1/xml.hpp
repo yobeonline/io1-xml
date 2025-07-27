@@ -41,7 +41,10 @@ namespace io1
 
     struct xml_done {};
 
-    template<char indent_char, unsigned indent_size, bool tree_tag=false, char closing='/'>
+    template <char indent_char, unsigned indent_increment, unsigned indent_size>
+    struct xml_tree;
+      
+    template <char indent_char, unsigned indent_size, bool tree_tag = false, char closing = '/'>
     struct xml_tag
     {
       explicit xml_tag(std::ostream & stream, std::string_view name) noexcept:
@@ -89,6 +92,19 @@ namespace io1
 
         return {};
       }
+
+      template <char indent_char, unsigned indent_increment, unsigned indent_size>
+      auto operator<<(xml_tree<indent_char, indent_increment, indent_size> tree) noexcept
+      {
+        assert(stream_ && "Don't use a moved from object");
+        if (empty_)
+        {
+          (*stream_) << '>';
+          empty_ = false;
+        }
+        return std::move(tree);
+      }
+      
 
       bool empty_{true};
       std::ostream * stream_;
@@ -140,10 +156,7 @@ namespace io1
 
       auto tree(std::string_view name) noexcept
       {
-        if (tag_.empty_) stream_ << '>';
-        tag_.empty_ = false;
-        
-        return xml_tree<indent_char, indent_increment, indent_size+indent_increment>(stream_, name);
+        return tag_ << xml_tree<indent_char, indent_increment, indent_size+indent_increment>(stream_, name);
       }
 
       template<typename T> xml_tree && operator<<(attr<T> const & a) && noexcept
