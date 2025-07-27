@@ -111,24 +111,7 @@ namespace io1
       std::string_view name_;
     };
 
-    enum class xml_ver { xml10, xml11};
     enum class xml_enc { UTF_8 };
-
-    std::ostream & operator<<(std::ostream & stream, xml_ver version) noexcept
-    {
-      switch (version)
-      {
-        case xml_ver::xml10:
-          stream << "1.0";
-          break;
-        case xml_ver::xml11:
-          stream << "1.1";
-          break;
-        default:
-          assert(false);
-      }
-      return stream;
-    }
 
     std::ostream & operator<<(std::ostream & stream, xml_enc encoding) noexcept
     {
@@ -179,10 +162,10 @@ namespace io1
 
     template<char indent_char, unsigned indent_size=0> struct xml_prolog
     {
-      explicit xml_prolog(std::ostream & stream, xml_ver version, xml_enc encoding, bool standalone) noexcept
+      explicit xml_prolog(std::ostream & stream, xml_enc encoding, bool standalone) noexcept
       {
         xml_tag<indent_char, indent_size, false, '?'>(stream, "?xml")
-          << attr("version", version)
+          << attr("version", "1.0")
           << attr("encoding", encoding)
           << attr("standalone", (standalone ? "yes" : "no"));
       }
@@ -195,11 +178,10 @@ namespace io1
     {
       explicit xml_doc(std::ostream & stream,
         std::string_view root_name,
-        xml_ver version=xml_ver::xml11,
         xml_enc encoding=xml_enc::UTF_8,
         bool standalone=true
       ) noexcept:
-      prolog_(stream, version, encoding, standalone),
+      prolog_(stream, encoding, standalone),
       root_(stream, root_name)
       {}
 
