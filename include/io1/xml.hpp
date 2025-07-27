@@ -23,6 +23,12 @@ namespace io1
     std::string_view name;
   };
 
+  struct tree
+  {
+    explicit tree(std::string_view name) noexcept:name(name) {}
+    std::string_view name;
+  };
+
   namespace details
   {
     template<char C, unsigned N>
@@ -44,7 +50,8 @@ namespace io1
     template <char indent_char, unsigned indent_increment, unsigned indent_size>
     struct xml_tree;
       
-    template <char indent_char, unsigned indent_size, bool tree_tag = false, char closing = '/'>
+    template <char indent_char, unsigned indent_increment, unsigned indent_size, bool tree_tag = false,
+              char closing = '/'>
     struct xml_tag
     {
       explicit xml_tag(std::ostream & stream, std::string_view name) noexcept:
@@ -84,17 +91,8 @@ namespace io1
         return *this;
       }
 
-      template<typename T> xml_done operator<<(T const & value) noexcept
-      {
-        assert(stream_ && "Don't use a moved from object");
-        (*stream_) << '>' << value;
-        empty_ = false;
-
-        return {};
-      }
-
-      template <char indent_char, unsigned indent_increment, unsigned indent_size>
-      auto operator<<(xml_tree<indent_char, indent_increment, indent_size> tree) noexcept
+      xml_tree<indent_char, indent_increment, indent_size + indent_increment>
+      operator<<(tree const & t) noexcept
       {
         assert(stream_ && "Don't use a moved from object");
         if (empty_)
@@ -102,9 +100,19 @@ namespace io1
           (*stream_) << '>';
           empty_ = false;
         }
-        return std::move(tree);
+
+        return xml_tree<indent_char, indent_increment, indent_size + indent_increment>{*stream_, t.name};
       }
-      
+        
+      template <typename T>
+      xml_done operator<<(T const & value) noexcept
+      {
+        assert(stream_ && "Don't use a moved from object");
+        (*stream_) << '>' << value;
+        empty_ = false;
+
+        return {};
+      }
 
       bool empty_{true};
       std::ostream * stream_;
@@ -137,11 +145,6 @@ namespace io1
 
       xml_tree(xml_tree && t) noexcept =default;
 
-      auto tree(std::string_view name) noexcept
-      {
-        return tag_ << xml_tree<indent_char, indent_increment, indent_size+indent_increment>(stream_, name);
-      }
-
       template<typename T> xml_tree && operator<<(attr<T> const & a) && noexcept
       {
         tag_ << a;
@@ -152,19 +155,24 @@ namespace io1
       {
         if (tag_.empty_) stream_ << '>';
         tag_.empty_ = false;
-        return xml_tag<indent_char, indent_size+indent_increment>(stream_, t.name);
+        return xml_tag<indent_char, indent_increment, indent_size+indent_increment>(stream_, t.name);
+      }
+
+      auto operator<<(tree const & t) & noexcept
+      {
+        return tag_ << t;
       }
 
       std::ostream & stream_;
       std::string_view name_;
-      xml_tag<indent_char, indent_size, true> tag_; // it is a special tag in the way that it closes on a new line
+      xml_tag<indent_char, indent_increment, indent_size, true> tag_; // it is a special tag in the way that it closes on a new line
     };
 
-    template<char indent_char, unsigned indent_size=0> struct xml_prolog
+    template<char indent_char, unsigned indent_increment, unsigned indent_size=0> struct xml_prolog
     {
       explicit xml_prolog(std::ostream & stream, xml_enc encoding, bool standalone) noexcept
       {
-        xml_tag<indent_char, indent_size, false, '?'>(stream, "?xml")
+        xml_tag<indent_char, indent_increment, indent_size, false, '?'>(stream, "?xml")
           << attr("version", "1.0")
           << attr("encoding", encoding)
           << attr("standalone", (standalone ? "yes" : "no"));
@@ -196,17 +204,17 @@ namespace io1
         return std::move(*this);
       }
 
-      auto tree(std::string_view name) noexcept
-      {
-        return root_.tree(name);
-      }
-
       auto operator<<(tag const & t) & noexcept
       {
         return root_ << t;
       }
 
-      xml_prolog<indent_char> prolog_;
+      auto operator<<(tree const & t) & noexcept
+      {
+        return root_ << t;
+      }
+
+      xml_prolog<indent_char, indent_increment> prolog_;
       xml_tree<indent_char, indent_increment> root_;
     };
   }
