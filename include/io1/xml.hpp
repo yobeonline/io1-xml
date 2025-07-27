@@ -35,7 +35,7 @@ namespace io1
     struct indent_string {
       std::array<char, N+1> value{};
 
-      constexpr indent_string() {
+      constexpr indent_string() noexcept {
         for (std::size_t i = 0; i < N; ++i) value[i] = C;
         value[N] = '\0';
       }
