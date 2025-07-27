@@ -57,29 +57,27 @@ namespace io1::xml
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(&stream), name_(name)
       {
-        (*stream_) << '\n' << indent<indent_char, indent_size>.c_str() << '<' << name_;
+        (*stream_) << indent<indent_char, indent_size>.c_str() << '<' << name_;
       }
 
       tag_impl(tag_impl && t) noexcept:
-      empty_(t.empty_), stream_(std::exchange(t.stream_, nullptr)), name_(std::move(t.name_))
+      empty_(t.empty_), stream_(std::exchange(t.stream_, nullptr)), name_(t.name_)
       {}
 
       ~tag_impl() noexcept
       {
         if (!stream_) return;
         if (empty_)
-        {
-          (*stream_) << ' ' << closing << '>';
+        { (*stream_) << ' ' << closing << ">\n";
         }
         else
         {
           if constexpr (tree_tag)
           {
-            (*stream_) << '\n' << indent<indent_char, indent_size>.c_str() << '<' << closing << name_ << '>';
+            (*stream_) << indent<indent_char, indent_size>.c_str() << '<' << closing << name_ << ">\n";
           }
           else
-          {
-            (*stream_) << '<' << closing << name_ << '>';
+          { (*stream_) << '<' << closing << name_ << ">\n";
           }
         }
       }
@@ -96,14 +94,25 @@ namespace io1::xml
       {
         assert(stream_ && "Don't use a moved from object");
         if (empty_)
-        {
-          (*stream_) << '>';
+        { (*stream_) << ">\n";
           empty_ = false;
         }
 
         return tree_impl<indent_char, indent_increment, indent_size + indent_increment>{*stream_, t.name};
       }
         
+      tag_impl<indent_char, indent_increment, indent_size + indent_increment> operator<<(tag const & t) noexcept
+      {
+        assert(stream_ && "Don't use a moved from object");
+        if (empty_)
+        {
+          (*stream_) << ">\n";
+          empty_ = false;
+        }
+
+        return tag_impl<indent_char, indent_increment, indent_size + indent_increment>{*stream_, t.name};
+      }
+
       template <typename T>
       done operator<<(T const & value) noexcept
       {
@@ -138,9 +147,7 @@ namespace io1::xml
 
       auto operator<<(tag const & t) & noexcept
       {
-        if (tag_.empty_) stream_ << '>';
-        tag_.empty_ = false;
-        return tag_impl<indent_char, indent_increment, indent_size+indent_increment>(stream_, t.name);
+        return tag_ << t;
       }
 
       auto operator<<(tree const & t) & noexcept
