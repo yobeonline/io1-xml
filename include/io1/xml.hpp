@@ -119,10 +119,10 @@ namespace io1
       switch (version)
       {
         case xml_ver::xml10:
-          stream << "1.0\"";
+          stream << "1.0";
           break;
         case xml_ver::xml11:
-          stream << "1.1\"";
+          stream << "1.1";
           break;
         default:
           assert(false);
@@ -135,7 +135,7 @@ namespace io1
       switch (encoding)
       {
         case xml_enc::UTF_8:
-          stream << "UTF-8\"";
+          stream << "UTF-8";
           break;
         default:
           assert(false);
