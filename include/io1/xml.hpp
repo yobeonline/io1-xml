@@ -31,33 +31,40 @@ namespace io1::xml
 
   namespace details
   {
-    template<char C, unsigned N>
-    struct indent_string {
-      std::array<char, N+1> value{};
+    template<char indent_char, unsigned indent_increment, unsigned indent_size>
+    struct indentation
+    {
+      using increased_t = indentation<indent_char, indent_increment, indent_size+indent_increment>;
 
-      constexpr indent_string() noexcept {
-        for (std::size_t i = 0; i < N; ++i) value[i] = C;
-        value[N] = '\0';
+      friend std::ostream & operator<<(std::ostream & stream, const indentation &) noexcept
+      {
+        constexpr static auto const indent_array = []
+        {
+          std::array<char, indent_size + 1> values;
+
+          for (auto & c : values) c = indent_char;
+          values[indent_size] = '\0';
+
+          return values;
+        }();
+
+        return stream << indent_array.data();
       }
-
-      constexpr char const * c_str() const noexcept { return value.data(); }
+   
     };
-
-    template<char C, unsigned N> constexpr auto indent = indent_string<C, N>{};
 
     struct done {};
 
-    template <char indent_char, unsigned indent_increment, unsigned indent_size>
+    template <class indent>
     struct tree_impl;
       
-    template <char indent_char, unsigned indent_increment, unsigned indent_size, bool tree_tag = false,
-              char closing = '/'>
+    template <class indent, bool tree_tag = false, char closing = '/'>
     struct tag_impl
     {
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(&stream), name_(name)
       {
-        (*stream_) << indent<indent_char, indent_size>.c_str() << '<' << name_;
+        (*stream_) << indent_ << '<' << name_;
       }
 
       tag_impl(tag_impl && t) noexcept:
@@ -68,16 +75,18 @@ namespace io1::xml
       {
         if (!stream_) return;
         if (empty_)
-        { (*stream_) << ' ' << closing << ">\n";
+        {
+          (*stream_) << ' ' << closing << ">\n";
         }
         else
         {
           if constexpr (tree_tag)
           {
-            (*stream_) << indent<indent_char, indent_size>.c_str() << '<' << closing << name_ << ">\n";
+            (*stream_) << indent_ << '<' << closing << name_ << ">\n";
           }
           else
-          { (*stream_) << '<' << closing << name_ << ">\n";
+          {
+            (*stream_) << '<' << closing << name_ << ">\n";
           }
         }
       }
@@ -89,7 +98,7 @@ namespace io1::xml
         return *this;
       }
 
-      tree_impl<indent_char, indent_increment, indent_size + indent_increment>
+      tree_impl<typename indent::increased_t>
       operator<<(tree const & t) noexcept
       {
         assert(stream_ && "Don't use a moved from object");
@@ -98,10 +107,10 @@ namespace io1::xml
           empty_ = false;
         }
 
-        return tree_impl<indent_char, indent_increment, indent_size + indent_increment>{*stream_, t.name};
+        return tree_impl<typename indent::increased_t>{*stream_, t.name};
       }
         
-      tag_impl<indent_char, indent_increment, indent_size + indent_increment> operator<<(tag const & t) noexcept
+      tag_impl<typename indent::increased_t> operator<<(tag const & t) noexcept
       {
         assert(stream_ && "Don't use a moved from object");
         if (empty_)
@@ -110,7 +119,7 @@ namespace io1::xml
           empty_ = false;
         }
 
-        return tag_impl<indent_char, indent_increment, indent_size + indent_increment>{*stream_, t.name};
+        return tag_impl<typename indent::increased_t>{*stream_, t.name};
       }
 
       template <typename T>
@@ -126,9 +135,10 @@ namespace io1::xml
       bool empty_{true};
       std::ostream * stream_;
       std::string_view name_;
+      constexpr static indent indent_;
     };
 
-    template<char indent_char, unsigned indent_increment, unsigned indent_size=0>
+    template<class indent>
     struct tree_impl
     {
       explicit tree_impl(std::ostream & stream, std::string_view name) noexcept:
@@ -157,14 +167,14 @@ namespace io1::xml
 
       std::ostream & stream_;
       std::string_view name_;
-      tag_impl<indent_char, indent_increment, indent_size, true> tag_; // it is a special tag in the way that it closes on a new line
+      tag_impl<indent, true> tag_; // it is a special tag in the way that it closes on a new line
     };
 
-    template<char indent_char, unsigned indent_increment, unsigned indent_size=0> struct prolog_impl
+    template<class indent> struct prolog_impl
     {
       explicit prolog_impl(std::ostream & stream, std::string_view encoding, bool standalone) noexcept
       {
-        tag_impl<indent_char, indent_increment, indent_size, false, '?'>(stream, "?xml")
+        tag_impl<indent, false, '?'>(stream, "?xml")
           << attr("version", "1.0")
           << attr("encoding", encoding)
           << attr("standalone", (standalone ? "yes" : "no"));
@@ -174,23 +184,23 @@ namespace io1::xml
     };
 
     template<char indent_char=' ', unsigned indent_increment=2>
-    struct doc
+    struct doc_impl
     {
-      explicit doc(std::ostream & stream,
+      explicit doc_impl(std::ostream & stream,
         std::string_view root_name,
-        std::string_view encoding = "UTF - 8",
+        std::string_view encoding = "UTF-8",
         bool standalone=true
       ) noexcept:
       prolog_(stream, encoding, standalone),
       root_(stream, root_name)
       {}
 
-      doc(doc && d) noexcept:
+      doc_impl(doc_impl && d) noexcept:
         prolog_(std::move(d.prolog_)),
         root_(std::move(d.root_))
       {}
 
-      template<typename T> doc && operator<<(attr<T> const & a) && noexcept
+      template<typename T> doc_impl && operator<<(attr<T> const & a) && noexcept
       {
         std::move(root_) << a;
         return std::move(*this);
@@ -206,10 +216,10 @@ namespace io1::xml
         return root_ << t;
       }
 
-      prolog_impl<indent_char, indent_increment> prolog_;
-      tree_impl<indent_char, indent_increment> root_;
+      prolog_impl<indentation<indent_char, indent_increment, 0>> prolog_;
+      tree_impl<indentation<indent_char, indent_increment, 0>> root_;
     };
   }
 
-  template<char indent_char=' ', unsigned indent_inc=2> using doc = details::doc<indent_char,indent_inc>;
+  template<char indent_char=' ', unsigned indent_inc=2> using doc = details::doc_impl<indent_char,indent_inc>;
 }
