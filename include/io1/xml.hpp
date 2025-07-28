@@ -62,78 +62,77 @@ namespace io1::xml
     struct tag_impl
     {
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
-      stream_(&stream), name_(name)
+      stream_(stream), name_(name)
       {
-        (*stream_) << indent_ << '<' << name_;
+        stream_ << indent_ << '<' << name_;
       }
 
-      tag_impl(tag_impl && t) noexcept:
-      empty_(t.empty_), stream_(std::exchange(t.stream_, nullptr)), name_(t.name_)
-      {}
+      tag_impl(tag_impl && other) noexcept : stream_(other.stream_), name_(other.name_)
+      {
+        other.active_ = false;
+      }
 
       ~tag_impl() noexcept
       {
-        if (!stream_) return;
+        if (!active_) return;
         if (empty_)
         {
-          (*stream_) << ' ' << closing << ">\n";
+          stream_ << ' ' << closing << ">\n";
         }
         else
         {
           if constexpr (tree_tag)
           {
-            (*stream_) << indent_ << '<' << closing << name_ << ">\n";
+            stream_ << indent_ << '<' << closing << name_ << ">\n";
           }
           else
           {
-            (*stream_) << '<' << closing << name_ << ">\n";
+            stream_ << '<' << closing << name_ << ">\n";
           }
         }
       }
 
       template<typename T> tag_impl & operator<<(attr<T> const & a) noexcept
       {
-        assert(stream_ && "Don't use a moved from object");
-        (*stream_) << ' ' << a.name << "=\"" << a.value << '\"';
+        stream_ << ' ' << a.name << "=\"" << a.value << '\"';
         return *this;
       }
 
       tree_impl<typename indent::increased_t>
       operator<<(tree const & t) noexcept
       {
-        assert(stream_ && "Don't use a moved from object");
         if (empty_)
-        { (*stream_) << ">\n";
+        {
+          stream_ << ">\n";
           empty_ = false;
         }
 
-        return tree_impl<typename indent::increased_t>{*stream_, t.name};
+        return tree_impl<typename indent::increased_t>{stream_, t.name};
       }
         
       tag_impl<typename indent::increased_t> operator<<(tag const & t) noexcept
       {
-        assert(stream_ && "Don't use a moved from object");
         if (empty_)
         {
-          (*stream_) << ">\n";
+          stream_ << ">\n";
           empty_ = false;
         }
 
-        return tag_impl<typename indent::increased_t>{*stream_, t.name};
+        return tag_impl<typename indent::increased_t>{stream_, t.name};
       }
 
       template <typename T>
       done operator<<(T const & value) noexcept
       {
-        assert(stream_ && "Don't use a moved from object");
-        (*stream_) << '>' << value;
+        stream_ << '>' << value;
         empty_ = false;
 
         return {};
       }
 
+      bool active_{true};
       bool empty_{true};
-      std::ostream * stream_;
+      std::ostream & stream_;
       std::string_view name_;
       constexpr static indent indent_;
     };
