@@ -56,18 +56,19 @@ namespace io1::xml
     struct done {};
 
     template <class indent>
-    struct tree_impl;
+    class tree_impl;
       
     template <class indent, bool tree_tag = false, char closing = '/'>
-    struct tag_impl
+    class tag_impl
     {
+    public:
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(stream), name_(name)
       {
         stream_ << indent_ << '<' << name_;
       }
 
-      tag_impl(tag_impl && other) noexcept : stream_(other.stream_), name_(other.name_)
+      constexpr tag_impl(tag_impl && other) noexcept : stream_(other.stream_), name_(other.name_)
       {
         other.active_ = false;
       }
@@ -130,6 +131,7 @@ namespace io1::xml
         return {};
       }
 
+    private:
       bool active_{true};
       bool empty_{true};
       std::ostream & stream_;
@@ -138,15 +140,16 @@ namespace io1::xml
     };
 
     template<class indent>
-    struct tree_impl
+    class tree_impl
     {
+    public:
       explicit tree_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(stream), name_(name), tag_(stream, name)
       {}
 
-      ~tree_impl() noexcept =default;
+      constexpr ~tree_impl() noexcept =default;
 
-      tree_impl(tree_impl && t) noexcept =default;
+      constexpr tree_impl(tree_impl && t) noexcept =default;
 
       template<typename T> tree_impl && operator<<(attr<T> const & a) && noexcept
       {
@@ -164,6 +167,7 @@ namespace io1::xml
         return tag_ << t;
       }
 
+    private:
       std::ostream & stream_;
       std::string_view name_;
       tag_impl<indent, true> tag_; // it is a special tag in the way that it closes on a new line
@@ -179,12 +183,13 @@ namespace io1::xml
           << attr("standalone", (standalone ? "yes" : "no"));
       }
 
-      prolog_impl(prolog_impl &&) noexcept {}
+      constexpr prolog_impl(prolog_impl &&) noexcept {}
     };
 
     template<char indent_char=' ', unsigned indent_increment=2>
-    struct doc_impl
+    class doc_impl
     {
+    public:
       explicit doc_impl(std::ostream & stream,
         std::string_view root_name,
         std::string_view encoding = "UTF-8",
@@ -194,7 +199,7 @@ namespace io1::xml
       root_(stream, root_name)
       {}
 
-      doc_impl(doc_impl && d) noexcept:
+      constexpr doc_impl(doc_impl && d) noexcept:
         prolog_(std::move(d.prolog_)),
         root_(std::move(d.root_))
       {}
@@ -215,6 +220,7 @@ namespace io1::xml
         return root_ << t;
       }
 
+    private:
       prolog_impl<indentation<indent_char, indent_increment, 0>> prolog_;
       tree_impl<indentation<indent_char, indent_increment, 0>> root_;
     };
