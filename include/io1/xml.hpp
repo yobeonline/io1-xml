@@ -53,6 +53,35 @@ namespace io1::xml
    
     };
 
+    template<typename T> struct is_string
+    {
+      constexpr static bool value=false;
+    };
+
+    template <>
+    struct is_string<std::string>
+    {
+      constexpr static bool value = true;
+    };
+
+    template<> struct is_string<std::string_view>
+    {
+      constexpr static bool value = true;
+    };
+
+    template<> 
+    struct is_string<char const *>
+    {
+      constexpr static bool value = true;
+    };
+
+    template<> struct is_string<char *>
+    {
+      constexpr static bool value = true;
+    };
+
+    template<typename T> constexpr static bool is_string_v = is_string<T>::value;
+
     struct done {};
 
     template <class indent>
@@ -125,10 +154,28 @@ namespace io1::xml
       template <typename T>
       done operator<<(T const & value) noexcept
       {
-        stream_ << '>' << value;
+        stream_ << '>';
+        if constexpr (is_string_v<T>) write_text(value);
+        else stream_ << value;
         empty_ = false;
 
         return {};
+      }
+
+    private:
+      void write_text(std::string_view value) noexcept
+      {
+        for (char c : value)
+        {
+          switch (c)
+          {
+          case '&': stream_ << "&amp;"; break;
+          case '<': stream_ << "&lt;"; break;
+          case '>': stream_ << "&gt;"; break;
+          default: stream_ << c; break;
+          }
+        }
+        return;
       }
 
     private:
