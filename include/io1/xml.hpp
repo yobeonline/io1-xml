@@ -23,6 +23,60 @@ namespace io1::xml
     std::string_view name;
   };
 
+  namespace details
+  {
+    constexpr bool is_valid_xml_name_char(char c)
+    {
+      return true; //std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.' || c == ':';
+    }
+
+    constexpr bool is_valid_xml_name_start(char c)
+    {
+      return true; //std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == ':';
+    }
+
+    template <size_t N>
+    struct ct_string
+    {
+      char value[N];
+
+      constexpr ct_string(char const (&str)[N])
+      {
+        for (std::size_t i = 0; i < N; ++i) value[i] = str[i];
+      }
+
+      constexpr std::string_view view() const { return {value, N - 1}; }
+
+      constexpr bool operator==(const ct_string &) const = default;
+    };
+
+    template <ct_string Name>
+    struct is_valid_xml_name
+    {
+      constexpr bool operator()() const noexcept
+      {
+        if constexpr (Name.value[0] == '\0') return false;
+        if (!is_valid_xml_name_start(Name.value[0])) return false;
+
+        for (std::size_t i = 1; Name.value[i] != '\0'; ++i)
+        {
+          if (!is_valid_xml_name_char(Name.value[i])) return false;
+        }
+        return true;
+      }
+    };
+  }
+
+  template <details::ct_string Name>
+  struct ct_tag {};
+
+  template <details::ct_string Name>
+  consteval auto operator""_tag()
+  {
+    //static_assert(details::is_valid_xml_name<Name>{}, "Invalid XML name");
+    return ct_tag<Name>{};
+  }
+
   struct tree
   {
     explicit tree(std::string_view name) noexcept:name(name) {}
@@ -31,12 +85,12 @@ namespace io1::xml
 
   namespace details
   {
-    template<char indent_char, unsigned indent_increment, unsigned indent_size>
+    template <char indent_char, unsigned indent_increment, unsigned indent_size>
     struct indentation
     {
       using increased_t = indentation<indent_char, indent_increment, indent_size+indent_increment>;
 
-      friend std::ostream & operator<<(std::ostream & stream, const indentation &) noexcept
+      constexpr static auto indent() noexcept
       {
         constexpr static auto const indent_array = []
         {
@@ -48,9 +102,8 @@ namespace io1::xml
           return values;
         }();
 
-        return stream << indent_array.data();
+        return indent_array.data();
       }
-   
     };
 
     template<typename T> struct is_string
@@ -82,19 +135,21 @@ namespace io1::xml
 
     template<typename T> constexpr static bool is_string_v = is_string<T>::value;
 
-    struct done {};
+    struct done
+    {
+    };
 
-    template <class indent>
+    template <class indentation>
     class tree_impl;
       
-    template <class indent, bool tree_tag = false, char closing = '/'>
-    class tag_impl
+    template <class indentation, bool tree_tag = false, char closing = '/'>
+    class tag_impl: private indentation
     {
     public:
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(stream), name_(name)
       {
-        stream_ << indent_ << '<' << name_;
+        stream_ << indentation::template indent() << '<' << name_;
       }
 
       constexpr tag_impl(tag_impl && other) noexcept : stream_(other.stream_), name_(other.name_)
@@ -113,7 +168,7 @@ namespace io1::xml
         {
           if constexpr (tree_tag)
           {
-            stream_ << indent_ << '<' << closing << name_ << ">\n";
+            stream_ << indentation::template indent() << '<' << closing << name_ << ">\n";
           }
           else
           {
@@ -128,8 +183,7 @@ namespace io1::xml
         return *this;
       }
 
-      tree_impl<typename indent::increased_t>
-      operator<<(tree const & t) noexcept
+      auto operator<<(tree const & t) noexcept
       {
         if (empty_)
         {
@@ -137,10 +191,10 @@ namespace io1::xml
           empty_ = false;
         }
 
-        return tree_impl<typename indent::increased_t>{stream_, t.name};
+        return tree_impl<typename indentation::increased_t>{stream_, t.name};
       }
         
-      tag_impl<typename indent::increased_t> operator<<(tag const & t) noexcept
+      auto operator<<(tag const & t) noexcept
       {
         if (empty_)
         {
@@ -148,7 +202,19 @@ namespace io1::xml
           empty_ = false;
         }
 
-        return tag_impl<typename indent::increased_t>{stream_, t.name};
+        return tag_impl<typename indentation::increased_t>{stream_, t.name};
+      }
+
+      template <details::ct_string str>
+      auto operator<<(ct_tag<str> const & t) noexcept
+      {
+        if (empty_)
+        {
+          stream_ << ">\n";
+          empty_ = false;
+        }
+        
+        return tag_impl<typename indentation::increased_t>{stream_, str.view()};
       }
 
       template <typename T>
@@ -183,10 +249,9 @@ namespace io1::xml
       bool empty_{true};
       std::ostream & stream_;
       std::string_view name_;
-      constexpr static indent indent_;
     };
 
-    template<class indent>
+    template<class indentation>
     class tree_impl
     {
     public:
@@ -209,6 +274,12 @@ namespace io1::xml
         return tag_ << t;
       }
 
+      template <details::ct_string str>
+      auto operator<<(ct_tag<str> const& t) noexcept
+      {
+        return tag_ << t;
+      }
+
       auto operator<<(tree const & t) & noexcept
       {
         return tag_ << t;
@@ -217,14 +288,15 @@ namespace io1::xml
     private:
       std::ostream & stream_;
       std::string_view name_;
-      tag_impl<indent, true> tag_; // it is a special tag in the way that it closes on a new line
+      tag_impl<indentation, true> tag_; // it is a special tag in the way that it closes on a new line
     };
 
-    template<class indent> struct prolog_impl
+    template <class indentation>
+    struct prolog_impl
     {
       explicit prolog_impl(std::ostream & stream, std::string_view encoding, bool standalone) noexcept
       {
-        tag_impl<indent, false, '?'>(stream, "?xml")
+        tag_impl<indentation, false, '?'>(stream, "?xml")
           << attr("version", "1.0")
           << attr("encoding", encoding)
           << attr("standalone", (standalone ? "yes" : "no"));
