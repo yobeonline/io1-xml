@@ -38,19 +38,17 @@ namespace io1::xml
     template <size_t N>
     struct ct_string
     {
-      char value[N];
+      std::array<char, N> value;
 
       constexpr ct_string(char const (&str)[N])
       {
         for (std::size_t i = 0; i < N; ++i) value[i] = str[i];
       }
 
-      constexpr std::string_view view() const { return {value, N - 1}; }
-
-      constexpr bool operator==(const ct_string &) const = default;
+      constexpr std::string_view view() const { return {value.data(), value.size() - 1}; }
     };
 
-    template <ct_string Name>
+    template <details::ct_string Name>
     struct is_valid_xml_name
     {
       constexpr bool operator()() const noexcept
@@ -65,6 +63,33 @@ namespace io1::xml
         return true;
       }
     };
+
+    struct ascii_element_name_validator
+    {
+      template<details::ct_string Name>
+      constexpr bool operator()() const noexcept
+      {
+        if constexpr (Name.value[0] == '\0') return false;
+        if (!is_valid_xml_name_start(Name.value[0])) return false;
+
+        for (std::size_t i = 1; Name.value[i] != '\0'; ++i)
+        {
+          if (!is_valid_xml_name_char(Name.value[i])) return false;
+        }
+        return true;
+
+      }
+    };
+
+    struct no_element_name_validator
+    {
+      template <details::ct_string Name>
+      consteval bool operator()() const noexcept
+      {
+        return true;
+      }
+    };
+
   }
 
   template <details::ct_string Name>
@@ -73,7 +98,7 @@ namespace io1::xml
   template <details::ct_string Name>
   consteval auto operator""_tag()
   {
-    //static_assert(details::is_valid_xml_name<Name>{}, "Invalid XML name");
+    static_assert(details::is_valid_xml_name<Name>{}(), "Invalid XML name");
     return ct_tag<Name>{};
   }
 
@@ -208,13 +233,7 @@ namespace io1::xml
       template <details::ct_string str>
       auto operator<<(ct_tag<str> const & t) noexcept
       {
-        if (empty_)
-        {
-          stream_ << ">\n";
-          empty_ = false;
-        }
-        
-        return tag_impl<typename indentation::increased_t>{stream_, str.view()};
+        return (*this) << tag(str.view());
       }
 
       template <typename T>
