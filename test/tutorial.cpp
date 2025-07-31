@@ -8,15 +8,15 @@ int main()
     
   {
       auto book = d << tree("book") << attr("category", "fiction") << attr("lang", "en");
-      book << "title"_tag << "The Time Machine";
-      book << "author"_tag << "H. G. Wells";
+      book << tag("title") << "The Time Machine";
+      book << tag("author") << "H. G. Wells";
       book << tag("price") << attr("currency", "USD") << 15.99;
   }
 
   {
       auto book = d << tree("book") << attr("category", "history") << attr("lang", "fr");
-      book << "title"_tag << "Les Miserables";
-      book << "author"_tag << "Victor & Hugo";
+      book << tag("title") << "Les Miserables";
+      book << tag("author") << "Victor & Hugo";
       book << tag("price") << attr("currency", "EUR") << 12.50;
   }
 

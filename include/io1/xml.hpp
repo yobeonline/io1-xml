@@ -9,102 +9,76 @@
 
 namespace io1::xml
 {
-  template<typename T>
+  namespace details
+  {
+    constexpr bool is_valid_xml_name_char(char c)
+    {
+      return true; // std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.' || c == ':';
+    }
+
+    constexpr bool is_valid_xml_name_start(char c)
+    {
+      return true; // std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == ':';
+    }
+
+    template <typename Iter>
+    constexpr bool validate_xml_name_range(Iter begin, Iter end) noexcept
+    {
+//      if (begin == end) return false;
+//      if (!is_valid_xml_name_start(*begin)) return false;
+//      ++begin;
+//      while (begin != end)
+//      {
+//        if (!is_valid_xml_name_char(*begin)) return false;
+//        ++begin;
+//      }
+      return true;
+    }
+
+    template <std::size_t N>
+    constexpr bool is_ascii_valid_xml_name(const char (&lit)[N]) noexcept
+    {
+      return validate_xml_name_range(lit, lit + N - 1); // exclude null terminator
+    }
+
+    // For runtime use
+    inline bool is_ascii_valid_xml_name(std::string_view name) noexcept
+    {
+      return validate_xml_name_range(name.begin(), name.end());
+    }
+  } // namespace details
+
+  template <typename T>
   struct attr
   {
-    explicit attr(std::string_view name, T const &value) noexcept:name(name), value(value) {}
+    explicit constexpr attr(std::string_view name, T const &value) noexcept:name(name), value(value) {}
     std::string_view name;
     T const &value;
   };
 
   struct tag
   {
-    explicit tag(std::string_view name) noexcept:name(name) {}
+    explicit tag(std::string_view name):name(name)
+    {
+      if (!details::is_ascii_valid_xml_name(name))
+      {
+        throw std::invalid_argument("Invalid XML tag name (must be ASCII-valid and XML-safe)");
+      }
+    }
+
+    template <std::size_t N>
+    explicit constexpr tag(const char (&lit)[N]) noexcept : name(lit, N - 1) // exclude null terminator
+    {
+      static_assert(details::is_ascii_valid_xml_name(lit),
+                    "Invalid XML tag name (must be ASCII-valid and XML-safe)");
+    }
+
     std::string_view name;
   };
 
-  namespace details
-  {
-    constexpr bool is_valid_xml_name_char(char c)
-    {
-      return true; //std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.' || c == ':';
-    }
-
-    constexpr bool is_valid_xml_name_start(char c)
-    {
-      return true; //std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == ':';
-    }
-
-    template <size_t N>
-    struct ct_string
-    {
-      std::array<char, N> value;
-
-      constexpr ct_string(char const (&str)[N])
-      {
-        for (std::size_t i = 0; i < N; ++i) value[i] = str[i];
-      }
-
-      constexpr std::string_view view() const { return {value.data(), value.size() - 1}; }
-    };
-
-    template <details::ct_string Name>
-    struct is_valid_xml_name
-    {
-      constexpr bool operator()() const noexcept
-      {
-        if constexpr (Name.value[0] == '\0') return false;
-        if (!is_valid_xml_name_start(Name.value[0])) return false;
-
-        for (std::size_t i = 1; Name.value[i] != '\0'; ++i)
-        {
-          if (!is_valid_xml_name_char(Name.value[i])) return false;
-        }
-        return true;
-      }
-    };
-
-    struct ascii_element_name_validator
-    {
-      template<details::ct_string Name>
-      constexpr bool operator()() const noexcept
-      {
-        if constexpr (Name.value[0] == '\0') return false;
-        if (!is_valid_xml_name_start(Name.value[0])) return false;
-
-        for (std::size_t i = 1; Name.value[i] != '\0'; ++i)
-        {
-          if (!is_valid_xml_name_char(Name.value[i])) return false;
-        }
-        return true;
-
-      }
-    };
-
-    struct no_element_name_validator
-    {
-      template <details::ct_string Name>
-      consteval bool operator()() const noexcept
-      {
-        return true;
-      }
-    };
-
-  }
-
-  template <details::ct_string Name>
-  struct ct_tag {};
-
-  template <details::ct_string Name>
-  consteval auto operator""_tag()
-  {
-    static_assert(details::is_valid_xml_name<Name>{}(), "Invalid XML name");
-    return ct_tag<Name>{};
-  }
-
   struct tree
   {
-    explicit tree(std::string_view name) noexcept:name(name) {}
+    constexpr explicit tree(std::string_view name) noexcept:name(name) {}
     std::string_view name;
   };
 
@@ -174,7 +148,7 @@ namespace io1::xml
       explicit tag_impl(std::ostream & stream, std::string_view name) noexcept:
       stream_(stream), name_(name)
       {
-        stream_ << indentation::template indent() << '<' << name_;
+        stream_ << indentation::indent() << '<' << name_;
       }
 
       constexpr tag_impl(tag_impl && other) noexcept : stream_(other.stream_), name_(other.name_)
@@ -193,7 +167,7 @@ namespace io1::xml
         {
           if constexpr (tree_tag)
           {
-            stream_ << indentation::template indent() << '<' << closing << name_ << ">\n";
+            stream_ << indentation::indent() << '<' << closing << name_ << ">\n";
           }
           else
           {
@@ -228,12 +202,6 @@ namespace io1::xml
         }
 
         return tag_impl<typename indentation::increased_t>{stream_, t.name};
-      }
-
-      template <details::ct_string str>
-      auto operator<<(ct_tag<str> const & t) noexcept
-      {
-        return (*this) << tag(str.view());
       }
 
       template <typename T>
@@ -292,13 +260,7 @@ namespace io1::xml
       {
         return tag_ << t;
       }
-
-      template <details::ct_string str>
-      auto operator<<(ct_tag<str> const& t) noexcept
-      {
-        return tag_ << t;
-      }
-
+      
       auto operator<<(tree const & t) & noexcept
       {
         return tag_ << t;
