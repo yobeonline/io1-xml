@@ -14,7 +14,7 @@ int main()
   }
 
   {
-      auto book = d << tree("book") << attr("category", "history") << attr("lang", "fr");
+      auto book = d << tree("book") << attr("category", "hist & ory") << attr("lang", "fr");
       book << tag("title") << "Les Miserables";
       book << tag("author") << "Victor & Hugo";
       book << tag("price") << attr("currency", "EUR") << 12.50;

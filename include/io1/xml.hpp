@@ -6,47 +6,10 @@
 #include <iostream>
 #include <cassert>
 #include <utility>
+#include <concepts>
 
 namespace io1::xml
 {
-  namespace details
-  {
-    constexpr bool is_valid_xml_name_char(char c)
-    {
-      return true; // std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.' || c == ':';
-    }
-
-    constexpr bool is_valid_xml_name_start(char c)
-    {
-      return true; // std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == ':';
-    }
-
-    template <typename Iter>
-    constexpr bool validate_xml_name_range(Iter begin, Iter end) noexcept
-    {
-//      if (begin == end) return false;
-//      if (!is_valid_xml_name_start(*begin)) return false;
-//      ++begin;
-//      while (begin != end)
-//      {
-//        if (!is_valid_xml_name_char(*begin)) return false;
-//        ++begin;
-//      }
-      return true;
-    }
-
-    template <std::size_t N>
-    constexpr bool is_ascii_valid_xml_name(const char (&lit)[N]) noexcept
-    {
-      return validate_xml_name_range(lit, lit + N - 1); // exclude null terminator
-    }
-
-    // For runtime use
-    inline bool is_ascii_valid_xml_name(std::string_view name) noexcept
-    {
-      return validate_xml_name_range(name.begin(), name.end());
-    }
-  } // namespace details
 
   template <typename T>
   struct attr
@@ -58,21 +21,7 @@ namespace io1::xml
 
   struct tag
   {
-    explicit tag(std::string_view name):name(name)
-    {
-      if (!details::is_ascii_valid_xml_name(name))
-      {
-        throw std::invalid_argument("Invalid XML tag name (must be ASCII-valid and XML-safe)");
-      }
-    }
-
-    template <std::size_t N>
-    explicit constexpr tag(const char (&lit)[N]) noexcept : name(lit, N - 1) // exclude null terminator
-    {
-      static_assert(details::is_ascii_valid_xml_name(lit),
-                    "Invalid XML tag name (must be ASCII-valid and XML-safe)");
-    }
-
+    explicit constexpr tag(std::string_view name) noexcept:name(name) {}
     std::string_view name;
   };
 
@@ -105,34 +54,42 @@ namespace io1::xml
       }
     };
 
-    template<typename T> struct is_string
+    template <typename T>
+    concept string_like = std::convertible_to<T, std::string_view>;
+
+    struct text_writer
     {
-      constexpr static bool value=false;
+      std::string_view text;
+
+      friend std::ostream & operator<<(std::ostream & stream, text_writer const & t) noexcept
+      {
+        for (char c : t.text)
+        {
+          switch (c)
+          {
+          case '&': stream << "&amp;"; break;
+          case '<': stream << "&lt;"; break;
+          case '>': stream << "&gt;"; break;
+          default: stream << c; break;
+          }
+        }
+
+        return stream;
+      }
     };
 
-    template <>
-    struct is_string<std::string>
+    template<typename T>
+      requires(!string_like<T>)
+    auto write(T const & value) noexcept
     {
-      constexpr static bool value = true;
-    };
+      return value;
+    }
 
-    template<> struct is_string<std::string_view>
+    template <string_like T>
+    auto write(T const & value) noexcept
     {
-      constexpr static bool value = true;
-    };
-
-    template<> 
-    struct is_string<char const *>
-    {
-      constexpr static bool value = true;
-    };
-
-    template<> struct is_string<char *>
-    {
-      constexpr static bool value = true;
-    };
-
-    template<typename T> constexpr static bool is_string_v = is_string<T>::value;
+      return text_writer{value};
+    }
 
     struct done
     {
@@ -178,7 +135,7 @@ namespace io1::xml
 
       template<typename T> tag_impl & operator<<(attr<T> const & a) noexcept
       {
-        stream_ << ' ' << a.name << "=\"" << a.value << '\"';
+        stream_ << ' ' << a.name << "=\"" << write(a.value) << '\"';
         return *this;
       }
 
@@ -207,9 +164,7 @@ namespace io1::xml
       template <typename T>
       done operator<<(T const & value) noexcept
       {
-        stream_ << '>';
-        if constexpr (is_string_v<T>) write_text(value);
-        else stream_ << value;
+        stream_ << '>' << write(value);
         empty_ = false;
 
         return {};
