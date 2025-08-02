@@ -60,7 +60,7 @@ if(IO1_WITH_TESTS)
 
   find_package(doctest CONFIG REQUIRED)
 
-  add_executable(test_${PROJECT_NAME} test/tutorial.cpp)
+  add_executable(test_${PROJECT_NAME} test/test_xml.cpp test/tutorial.cpp)
   target_link_libraries(test_${PROJECT_NAME} PRIVATE io1::xml
                                                      doctest::doctest)
 

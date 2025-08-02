@@ -1,7 +1,7 @@
 #include <iostream>
 #include "io1/xml.hpp"
 
-int main()
+int tutorial()
 {
   using namespace io1::xml;
   auto d = doc(std::cout, "bookstore");
