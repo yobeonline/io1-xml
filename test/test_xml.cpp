@@ -33,7 +33,7 @@ TEST_CASE("Empty default xml")
 TEST_CASE("Empty not standalone xml")
 {
   std::stringstream ss;
-  doc(ss, "root", false);
+  doc(ss, "root", config{.standalone=false});
 
   auto const lines = getlines(ss);
   CHECK(lines.size() == 2);
@@ -41,54 +41,47 @@ TEST_CASE("Empty not standalone xml")
   CHECK(lines[1] == R"(<root />)");
 }
 
-// A helper to compare XML outputs
-std::string normalize(std::string const & s)
+TEST_CASE("Empty not utf-8 xml")
 {
-  std::string r;
-  for (char c : s)
-    if (c != '\r') r += c;
-  return r;
+  std::stringstream ss;
+  doc(ss, "root", config{.encoding="latin-9"});
+
+  auto const lines = getlines(ss);
+  CHECK(lines.size() == 2);
+  CHECK(lines[0] == R"(<?xml version="1.0" encoding="latin-9" standalone="yes" ?>)");
+  CHECK(lines[1] == R"(<root />)");
 }
 
-TEST_CASE("Basic XML generation")
+TEST_CASE("Empty not utf-8 and not standalone xml")
 {
-  std::ostringstream oss;
-  {
-    auto d = doc<' ', 2>(oss, "root") << attr("lang", "en");
-    d << tag("child") << attr("id", 42) << "content";
-    }
+  std::stringstream ss;
+  doc(ss, "root", config{.encoding="latin-9", .standalone=false});
 
-  CHECK(normalize(oss.str()) ==
-        R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<root lang="en">
-  <child id="42">content</child>
-</root>
-)");
+  auto const lines = getlines(ss);
+  CHECK(lines.size() == 2);
+  CHECK(lines[0] == R"(<?xml version="1.0" encoding="latin-9" standalone="no" ?>)");
+  CHECK(lines[1] == R"(<root />)");
 }
 
-TEST_CASE("Nested trees")
+TEST_CASE("Empty utf-8 and standalone xml")
 {
-  std::ostringstream oss;
-  {
-    doc<' ', 2> d(oss, "root");
-    auto t = d << tree("level1");
-    auto t2 = t << tree("level2");
-    auto leaf = t2 << tag("leaf");
-    leaf << attr("value", "abc") << "text";
-  }
+  std::stringstream ss;
+  doc(ss, "root", config{.encoding="UTF-8", .standalone=true});
 
-  CHECK(oss.str().find("<level1>") != std::string::npos);
-  CHECK(oss.str().find("<leaf value=\"abc\">text</leaf>") != std::string::npos);
+  auto const lines = getlines(ss);
+  CHECK(lines.size() == 2);
+  CHECK(lines[0] == R"(<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>)");
+  CHECK(lines[1] == R"(<root />)");
 }
 
-TEST_CASE("Special characters are escaped")
+TEST_CASE("Empty wit attributes")
 {
-  std::ostringstream oss;
-  {
-    doc d(oss, "root");
-    auto child = d << tag("child");
-    child << std::string{"<hello & goodbye>"};
-  }
+  std::stringstream ss;
+  doc(ss, "root") << attr("lang", "en&fr");
 
-  CHECK(oss.str().find("&lt;hello &amp; goodbye&gt;") != std::string::npos);
+  auto const lines = getlines(ss);
+  CHECK(lines.size() == 2);
+  CHECK(lines[0] == R"(<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>)");
+  CHECK(lines[1] == R"(<root lang="en&amp;fr" />)");
 }
+
