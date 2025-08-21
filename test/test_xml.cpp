@@ -74,7 +74,7 @@ TEST_CASE("Empty utf-8 and standalone xml")
   CHECK(lines[1] == R"(<root />)");
 }
 
-TEST_CASE("Empty wit attributes")
+TEST_CASE("Empty with attributes")
 {
   std::stringstream ss;
   doc(ss, "root") << attr("lang", "en&fr");
@@ -85,3 +85,18 @@ TEST_CASE("Empty wit attributes")
   CHECK(lines[1] == R"(<root lang="en&amp;fr" />)");
 }
 
+TEST_CASE("Top-level tags")
+{
+  std::stringstream ss;
+  {
+    auto d = doc(ss, "root");
+    d << tag("foo");
+  }
+
+  auto const lines = getlines(ss);
+  CHECK(lines.size() == 4);
+  CHECK(lines[0] == R"(<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>)");
+  CHECK(lines[1] == R"(<root>)");
+  CHECK(lines[2] == R"(  <foo />)");
+  CHECK(lines[3] == R"(</root>)");
+}
