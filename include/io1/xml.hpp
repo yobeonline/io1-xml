@@ -68,6 +68,7 @@ namespace io1::xml
           switch (c)
           {
           case '&': stream << "&amp;"; break;
+          case '"': stream << "&quot;"; break;
           case '<': stream << "&lt;"; break;
           case '>': stream << "&gt;"; break;
           default: stream << c; break;
@@ -159,22 +160,6 @@ namespace io1::xml
         empty_ = false;
 
         return {};
-      }
-
-    private:
-      void write_text(std::string_view value) noexcept
-      {
-        for (char c : value)
-        {
-          switch (c)
-          {
-          case '&': stream_ << "&amp;"; break;
-          case '<': stream_ << "&lt;"; break;
-          case '>': stream_ << "&gt;"; break;
-          default: stream_ << c; break;
-          }
-        }
-        return;
       }
 
     private:
